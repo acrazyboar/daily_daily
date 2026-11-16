@@ -204,6 +204,22 @@ function App() {
   const [externalChange, setExternalChange] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [debugOpen, setDebugOpen] = useState(false);
+  const debugClicks = useRef({ count: 0, started: 0 });
+  function onBrandClick() {
+    const now = performance.now();
+    const clicks = debugClicks.current;
+    if (!clicks.count || now - clicks.started > 1000) {
+      clicks.count = 1;
+      clicks.started = now;
+    } else {
+      clicks.count += 1;
+    }
+    if (clicks.count === 3) {
+      clicks.count = 0;
+      setDebugOpen(open => !open);
+      if (!debugOpen) void refresh();
+    }
+  }
   const [extraOpen, setExtraOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -447,7 +463,8 @@ function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-icon">日</span>
+          <button className="brand-icon" aria-label="日日记" aria-expanded={debugOpen} aria-controls={debugOpen ? "date-debug-panel" : undefined}
+            onClick={onBrandClick} onBlur={() => { debugClicks.current.count = 0; }}>日</button>
           <div>
             日日记<small>把关注，变成日常。</small>
           </div>
@@ -508,16 +525,6 @@ function App() {
           </button>
         </nav>
         <div className="sidebar-bottom">
-          <button
-            className="debug-toggle"
-            aria-expanded={debugOpen}
-            onClick={() => {
-              setDebugOpen(!debugOpen);
-              if (!debugOpen) void refresh();
-            }}
-          >
-            ⌁ {debugOpen ? "收起日期调试" : "日期调试"}
-          </button>
           <span className="local-dot" />
           {data?.clock?.simulated ? "模拟记录（独立目录）" : "记录保存在数据文件夹"}
           <button className="folder-link" onClick={openFolder}>

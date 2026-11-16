@@ -39,7 +39,7 @@ export default function DateDebugPanel({
   const clock = data.clock;
   const events = data.items.filter((i) => i.event);
   return (
-    <section className="date-debug-panel" aria-label="日期调试面板">
+    <section id="date-debug-panel" className="date-debug-panel" aria-label="日期调试面板">
       <div className="debug-heading">
         <div>
           <p className="eyebrow">DATE MONITOR</p>
