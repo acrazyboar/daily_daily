@@ -55,6 +55,7 @@ export type ClockInfo = {
   changes: ClockChange[];
 };
 export type Snapshot = {
+  storageRevision: string;
   today: string;
   folder: string;
   items: Focus[];

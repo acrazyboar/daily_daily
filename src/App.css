@@ -2244,3 +2244,14 @@ select:focus-visible {
     flex-basis: 100%;
   }
 }
+
+.storage-settings { display: grid; gap: 24px; margin-top: 24px; }
+.storage-card { padding: 28px; background: #fff; border: 1px solid var(--border, #dfe5da); border-radius: 18px; }
+.storage-card h2 { margin-top: 0; }
+.storage-card dl { margin: 24px 0; }
+.storage-card dt { color: #798875; margin-top: 18px; }
+.storage-card dd { margin: 8px 0; overflow-wrap: anywhere; line-height: 1.7; }
+.storage-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.storage-preview { border: 2px solid #9bab86; }
+.storage-card li { margin: 12px 0; line-height: 1.7; }
+.storage-card p { line-height: 1.8; }

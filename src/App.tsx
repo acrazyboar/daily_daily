@@ -1,3 +1,4 @@
+import StorageSettings from "./StorageSettings";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
@@ -176,11 +177,14 @@ function EntryCard({
   );
 }
 function App() {
-  const [page, setPage] = useState<"today" | "overview" | "manage" | "events">(
+  const [page, setPage] = useState<"today" | "overview" | "manage" | "events" | "storage">(
     "today",
   );
   const [data, setData] = useState<Snapshot | null>(null);
   const [busy, setBusy] = useState(false);
+  const [storagePending, setStoragePending] = useState(false);
+  const [externalChange, setExternalChange] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [debugOpen, setDebugOpen] = useState(false);
   const [extraOpen, setExtraOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -227,6 +231,13 @@ function App() {
       try {
         const value = await invoke<Snapshot>("load_check_ins", { reason });
         if (ticket === revision.current) {
+          const old = lastSnapshot.current;
+          if (old?.storageRevision && old.folder === value.folder && old.storageRevision !== value.storageRevision && reason !== "manual" && old.clock?.simulated === value.clock?.simulated) {
+            setExternalChange(true);
+            return;
+          }
+          if (reason === "manual" && old?.storageRevision !== value.storageRevision) setReloadKey(k => k + 1);
+          setExternalChange(false);
           applySnapshot(value);
           setError("");
         }
@@ -288,10 +299,12 @@ function App() {
       const value = await invoke<Snapshot>(command, {
         ...args,
         clockGeneration: lastSnapshot.current?.clock?.generation ?? 0,
+        expectedRevision: lastSnapshot.current?.storageRevision ?? "",
       });
       applySnapshot(value);
-      if (command === "set_debug_date") {
-        setPage("today");
+      setExternalChange(false);
+      if (command === "set_debug_date" || command === "confirm_storage_folder") {
+        if(command === "set_debug_date") setPage("today");
         setEditingId("");
         setConfirmId("");
         setSelected(null);
@@ -443,7 +456,7 @@ function App() {
           ))}
           <div className="nav-management">
             <button
-              className={`nav nav-parent ${page === "manage" || page === "events" ? "active" : ""}`}
+              className={`nav nav-parent ${page === "manage" || page === "events" || page === "storage" ? "active" : ""}`}
               onClick={() => {
                 setPage("manage");
                 setMessage("");
@@ -456,6 +469,7 @@ function App() {
                 [
                   { id: "manage", label: "打卡" },
                   { id: "events", label: "事件" },
+                  { id: "storage", label: "数据存储" },
                 ] as const
               ).map((p) => (
                 <button
@@ -485,7 +499,7 @@ function App() {
             ⌁ {debugOpen ? "收起日期调试" : "日期调试"}
           </button>
           <span className="local-dot" />
-          {data?.clock?.simulated ? "模拟记录（独立目录）" : "记录保存在本机"}
+          {data?.clock?.simulated ? "模拟记录（独立目录）" : "记录保存在数据文件夹"}
           <button className="folder-link" onClick={openFolder}>
             打开记录文件夹 ↗
           </button>
@@ -495,7 +509,7 @@ function App() {
         </div>
       </aside>
       <main
-        key={`${data?.clock?.simulated ? "debug" : "live"}:${data?.clock?.generation ?? 0}`}
+        key={`${data?.clock?.simulated ? "debug" : "live"}:${data?.clock?.generation ?? 0}:${reloadKey}`}
       >
         <header>
           <div>
@@ -505,7 +519,7 @@ function App() {
                 ? "管理 / 打卡"
                 : page === "events"
                   ? "管理 / 事件"
-                  : page.toUpperCase()}
+                  : page === "storage" ? "管理 / 数据存储" : page.toUpperCase()}
             </p>
             <h1>
               {page === "today"
@@ -514,7 +528,7 @@ function App() {
                   ? "每个关注点，都有自己的轨迹。"
                   : page === "events"
                     ? "每一段经历，都值得被记录。"
-                    : "把在意的事，放进日常。"}
+                    : page === "storage" ? "让记录，跟着你。" : "把在意的事，放进日常。"}
             </h1>
             <p className="subtitle">
               {page === "today"
@@ -525,18 +539,18 @@ function App() {
                     : "回看全年：长期关注使用日格，事件使用连续时间条。"
                   : page === "events"
                     ? "为短期的事设定起止日期，每天留下进展，结束后保留回忆。"
-                    : "添加你想关注的内容；移除后保留历史，也可以随时恢复。"}
+                    : page === "storage" ? "管理数据位置，连接你的 iCloud Drive 文件夹。" : "添加你想关注的内容；移除后保留历史，也可以随时恢复。"}
             </p>
           </div>
           <button
             className="secondary"
-            disabled={loading || busy}
+            disabled={loading || busy || storagePending}
             onClick={() => void refresh()}
           >
             {loading ? "读取中…" : "刷新记录"}
           </button>
         </header>
-        {(page === "manage" || page === "events") && (
+        {(page === "manage" || page === "events" || page === "storage") && (
           <div className="management-tabs" role="group" aria-label="管理分类">
             <button
               aria-pressed={page === "manage"}
@@ -556,8 +570,11 @@ function App() {
             >
               事件
             </button>
+            <button aria-pressed={page === "storage"} onClick={() => { setPage("storage"); setMessage(""); }}>数据存储</button>
           </div>
         )}
+        {externalChange && <div className="debug-mode-notice" role="alert">数据文件已被外部修改，尚未替换当前表单。请先复制未保存的内容，再点击“刷新记录”载入最新数据。</div>}
+        {page === "storage" && <StorageSettings data={data} disabled={busy || storagePending} change={action} onPending={(v) => { setStoragePending(v); mutating.current = v; }} />}
         {data?.clock?.simulated && (
           <div className="debug-mode-notice" role="status">
             正在使用模拟日期 <strong>{data.today}</strong> ·

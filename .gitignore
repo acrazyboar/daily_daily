@@ -35,3 +35,8 @@ dist-ssr
 # Local application data (never commit personal records)
 /check-ins/
 /debug-check-ins/
+
+# Machine-specific storage configuration and recovery files
+/storage-settings.json
+/storage-backups/
+/state.json

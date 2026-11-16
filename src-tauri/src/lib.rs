@@ -1,3 +1,4 @@
+mod storage;
 use chrono::{Datelike, Local};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -191,18 +192,25 @@ fn set_check_in_exception(
     expected_skipped: bool,
     expected_extra: bool,
     clock_generation: u64,
+    expected_revision: String,
     lock: tauri::State<Mutex<RuntimeState>>,
 ) -> Result<Snapshot, String> {
-    mutate(&app, &lock, clock_generation, |store, _today| {
-        set_exception(
-            store,
-            &item_id,
-            &date,
-            action,
-            expected_skipped,
-            expected_extra,
-        )
-    })
+    mutate(
+        &app,
+        &lock,
+        clock_generation,
+        &expected_revision,
+        |store, _today| {
+            set_exception(
+                store,
+                &item_id,
+                &date,
+                action,
+                expected_skipped,
+                expected_extra,
+            )
+        },
+    )
 }
 fn update_repeat(
     store: &mut Store,
@@ -362,6 +370,7 @@ struct Snapshot {
     items: Vec<Focus>,
     records: Vec<Entry>,
     clock: ClockInfo,
+    storage_revision: String,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -395,6 +404,7 @@ struct ClockInfo {
 #[derive(Default)]
 struct RuntimeState {
     date_override: Option<String>,
+    pending_storage: Option<storage::Pending>,
     previous_date: Option<String>,
     previous_system: Option<String>,
     checked_at: String,
@@ -496,9 +506,7 @@ fn today() -> String {
 }
 fn records_dir(app: &tauri::AppHandle, simulated: bool) -> Result<PathBuf, String> {
     let root = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let folder = workspace_dir(&root, simulated);
-    fs::create_dir_all(&folder).map_err(|e| format!("无法创建记录文件夹：{e}"))?;
-    Ok(folder)
+    storage::directory(&root, simulated)
 }
 fn valid_date(date: &str) -> bool {
     chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
@@ -583,6 +591,9 @@ fn write_store(folder: &Path, store: &Store) -> Result<(), String> {
     Ok(())
 }
 fn read_store(folder: &Path) -> Result<Store, String> {
+    read_store_impl(folder, true)
+}
+fn read_store_impl(folder: &Path, allow_initialize: bool) -> Result<Store, String> {
     let path = folder.join("state.json");
     match fs::read(&path) {
         Ok(bytes) => {
@@ -645,7 +656,11 @@ fn read_store(folder: &Path) -> Result<Store, String> {
             }
             return Ok(store);
         }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            if !allow_initialize {
+                return Err("记录文件暂不可用，请确认已下载后刷新；没有创建空数据。".into());
+            }
+        }
         Err(e) => return Err(format!("无法读取数据：{e}")),
     }
     let mut store = Store {
@@ -694,14 +709,16 @@ fn read_store(folder: &Path) -> Result<Store, String> {
     write_store(folder, &store)?;
     Ok(store)
 }
-fn snapshot(folder: &Path, store: Store, state: &RuntimeState) -> Snapshot {
-    Snapshot {
+fn snapshot(folder: &Path, store: Store, state: &RuntimeState) -> Result<Snapshot, String> {
+    let storage_revision = storage::revision_for_store(folder, &store)?;
+    Ok(Snapshot {
         today: state.date(),
         folder: folder.to_string_lossy().into_owned(),
         items: store.items,
         records: store.records,
         clock: state.info(),
-    }
+        storage_revision,
+    })
 }
 fn ensure_clock(state: &RuntimeState, generation: u64) -> Result<(), String> {
     if state.generation != generation {
@@ -713,16 +730,18 @@ fn mutate(
     app: &tauri::AppHandle,
     lock: &Mutex<RuntimeState>,
     clock_generation: u64,
+    expected_revision: &str,
     action: impl FnOnce(&mut Store, &str) -> Result<(), String>,
 ) -> Result<Snapshot, String> {
     let mut state = lock.lock().map_err(|e| e.to_string())?;
     state.observe("operation");
     ensure_clock(&state, clock_generation)?;
     let folder = records_dir(app, state.date_override.is_some())?;
-    let mut store = read_store(&folder)?;
+    let mut store = read_store_impl(&folder, false)?;
     action(&mut store, &state.date())?;
-    write_store(&folder, &store)?;
-    Ok(snapshot(&folder, store, &state))
+    let root = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    storage::guarded_write(&root, &folder, &store, expected_revision)?;
+    snapshot(&folder, store, &state)
 }
 #[tauri::command]
 fn load_check_ins(
@@ -740,15 +759,18 @@ fn load_check_ins(
     };
     state.observe(reason);
     let folder = records_dir(&app, state.date_override.is_some())?;
-    Ok(snapshot(&folder, read_store(&folder)?, &state))
+    let root = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    snapshot(
+        &folder,
+        storage::read_current(&root, state.date_override.is_some())?,
+        &state,
+    )
 }
 fn prepare_debug_store(root: &Path) -> Result<(), String> {
     let debug = workspace_dir(root, true);
     fs::create_dir_all(&debug).map_err(|e| e.to_string())?;
     if !debug.join("state.json").exists() {
-        let live = workspace_dir(root, false);
-        fs::create_dir_all(&live).map_err(|e| e.to_string())?;
-        write_store(&debug, &read_store(&live)?)?;
+        write_store(&debug, &storage::read_current(root, false)?)?;
     }
     Ok(())
 }
@@ -757,6 +779,7 @@ fn set_debug_date(
     app: tauri::AppHandle,
     date: Option<String>,
     clock_generation: u64,
+    expected_revision: String,
     lock: tauri::State<Mutex<RuntimeState>>,
 ) -> Result<Snapshot, String> {
     if date
@@ -768,13 +791,19 @@ fn set_debug_date(
     let mut state = lock.lock().map_err(|e| e.to_string())?;
     state.observe("debug-request");
     ensure_clock(&state, clock_generation)?;
+    let current = records_dir(&app, state.date_override.is_some())?;
+    if storage::revision(&current)? != expected_revision {
+        return Err("数据已变化，请先刷新记录再切换日期。".into());
+    }
+    state.pending_storage = None;
     if date.is_some() {
         prepare_debug_store(&app.path().app_data_dir().map_err(|e| e.to_string())?)?;
     }
     let folder = records_dir(&app, date.is_some())?;
-    let store = read_store(&folder)?;
+    let root = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let store = storage::read_current(&root, date.is_some())?;
     state.set_override(date);
-    Ok(snapshot(&folder, store, &state))
+    snapshot(&folder, store, &state)
 }
 fn add_item_on(
     store: &mut Store,
@@ -827,19 +856,26 @@ fn add_focus(
     best_first: bool,
     repeat: RepeatRule,
     clock_generation: u64,
+    expected_revision: String,
     lock: tauri::State<Mutex<RuntimeState>>,
 ) -> Result<Snapshot, String> {
-    mutate(&app, &lock, clock_generation, |store, date| {
-        validate_repeat(&repeat)?;
-        if let RepeatRule::Once { date: fixed } = &repeat {
-            if fixed.as_str() < date {
-                return Err("固定日期不能早于今天。".into());
+    mutate(
+        &app,
+        &lock,
+        clock_generation,
+        &expected_revision,
+        |store, date| {
+            validate_repeat(&repeat)?;
+            if let RepeatRule::Once { date: fixed } = &repeat {
+                if fixed.as_str() < date {
+                    return Err("固定日期不能早于今天。".into());
+                }
             }
-        }
-        add_item_on(store, name, states, best_first, date)?;
-        let id = store.items.last().unwrap().id.clone();
-        update_repeat(store, &id, repeat, date)
-    })
+            add_item_on(store, name, states, best_first, date)?;
+            let id = store.items.last().unwrap().id.clone();
+            update_repeat(store, &id, repeat, date)
+        },
+    )
 }
 fn update_choices(
     store: &mut Store,
@@ -871,14 +907,21 @@ fn update_focus_states(
     best_first: bool,
     repeat: Option<RepeatRule>,
     clock_generation: u64,
+    expected_revision: String,
     lock: tauri::State<Mutex<RuntimeState>>,
 ) -> Result<Snapshot, String> {
-    mutate(&app, &lock, clock_generation, |store, date| {
-        if let Some(rule) = repeat {
-            update_repeat(store, &item_id, rule, date)?;
-        }
-        update_choices(store, &item_id, states, best_first)
-    })
+    mutate(
+        &app,
+        &lock,
+        clock_generation,
+        &expected_revision,
+        |store, date| {
+            if let Some(rule) = repeat {
+                update_repeat(store, &item_id, rule, date)?;
+            }
+            update_choices(store, &item_id, states, best_first)
+        },
+    )
 }
 fn archive_item(store: &mut Store, item_id: &str, archived: bool) -> Result<(), String> {
     let item = store
@@ -911,11 +954,16 @@ fn archive_focus(
     item_id: String,
     archived: bool,
     clock_generation: u64,
+    expected_revision: String,
     lock: tauri::State<Mutex<RuntimeState>>,
 ) -> Result<Snapshot, String> {
-    mutate(&app, &lock, clock_generation, |store, _date| {
-        archive_item(store, &item_id, archived)
-    })
+    mutate(
+        &app,
+        &lock,
+        clock_generation,
+        &expected_revision,
+        |store, _date| archive_item(store, &item_id, archived),
+    )
 }
 fn validate_record_date(item: &Focus, record_date: &str, current_date: &str) -> Result<(), String> {
     if !valid_date(record_date) || record_date > current_date {
@@ -1004,11 +1052,16 @@ fn save_check_in(
     note: String,
     expected_date: String,
     clock_generation: u64,
+    expected_revision: String,
     lock: tauri::State<Mutex<RuntimeState>>,
 ) -> Result<Snapshot, String> {
-    mutate(&app, &lock, clock_generation, |store, date| {
-        save_entry_on(store, item_id, status, note, expected_date, date)
-    })
+    mutate(
+        &app,
+        &lock,
+        clock_generation,
+        &expected_revision,
+        |store, date| save_entry_on(store, item_id, status, note, expected_date, date),
+    )
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1072,11 +1125,16 @@ fn save_history_check_in(
     app: tauri::AppHandle,
     edit: HistoryEdit,
     clock_generation: u64,
+    expected_revision: String,
     lock: tauri::State<Mutex<RuntimeState>>,
 ) -> Result<Snapshot, String> {
-    mutate(&app, &lock, clock_generation, |store, date| {
-        save_history_entry_on(store, edit, date)
-    })
+    mutate(
+        &app,
+        &lock,
+        clock_generation,
+        &expected_revision,
+        |store, date| save_history_entry_on(store, edit, date),
+    )
 }
 fn add_event_item(store: &mut Store, draft: EventDraft) -> Result<(), String> {
     let name = draft.name.trim().to_string();
@@ -1121,11 +1179,16 @@ fn add_event(
     app: tauri::AppHandle,
     draft: EventDraft,
     clock_generation: u64,
+    expected_revision: String,
     lock: tauri::State<Mutex<RuntimeState>>,
 ) -> Result<Snapshot, String> {
-    mutate(&app, &lock, clock_generation, |store, _date| {
-        add_event_item(store, draft)
-    })
+    mutate(
+        &app,
+        &lock,
+        clock_generation,
+        &expected_revision,
+        |store, _date| add_event_item(store, draft),
+    )
 }
 fn finish_event_item(store: &mut Store, item_id: &str, date: &str) -> Result<(), String> {
     let event = store
@@ -1146,14 +1209,21 @@ fn finish_event(
     item_id: String,
     expected_date: String,
     clock_generation: u64,
+    expected_revision: String,
     lock: tauri::State<Mutex<RuntimeState>>,
 ) -> Result<Snapshot, String> {
-    mutate(&app, &lock, clock_generation, |store, date| {
-        if expected_date != date {
-            return Err("日期已变化，请刷新后重试。".into());
-        }
-        finish_event_item(store, &item_id, date)
-    })
+    mutate(
+        &app,
+        &lock,
+        clock_generation,
+        &expected_revision,
+        |store, date| {
+            if expected_date != date {
+                return Err("日期已变化，请刷新后重试。".into());
+            }
+            finish_event_item(store, &item_id, date)
+        },
+    )
 }
 fn extend_event_item(
     store: &mut Store,
@@ -1187,14 +1257,21 @@ fn extend_event(
     end_date: String,
     expected_date: String,
     clock_generation: u64,
+    expected_revision: String,
     lock: tauri::State<Mutex<RuntimeState>>,
 ) -> Result<Snapshot, String> {
-    mutate(&app, &lock, clock_generation, |store, date| {
-        if expected_date != date {
-            return Err("日期已变化，请刷新后重试。".into());
-        }
-        extend_event_item(store, &item_id, end_date, date)
-    })
+    mutate(
+        &app,
+        &lock,
+        clock_generation,
+        &expected_revision,
+        |store, date| {
+            if expected_date != date {
+                return Err("日期已变化，请刷新后重试。".into());
+            }
+            extend_event_item(store, &item_id, end_date, date)
+        },
+    )
 }
 #[tauri::command]
 fn open_records_folder(
@@ -1216,7 +1293,12 @@ pub fn run() {
     tauri::Builder::default()
         .manage(Mutex::new(RuntimeState::default()))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            storage::storage_info,
+            storage::choose_storage_folder,
+            storage::confirm_storage_folder,
+            storage::open_storage_backups,
             load_check_ins,
             set_debug_date,
             set_check_in_exception,
