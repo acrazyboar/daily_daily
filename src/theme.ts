@@ -6,6 +6,7 @@ export const THEMES = [
   { name: "暮光紫", color: "#796094" },
   { name: "暖陶橙", color: "#a5683e" },
   { name: "玫瑰粉", color: "#a35d78" },
+  { name: "白色", color: "#ffffff" },
 ];
 export function readTheme(): string {
   try {
@@ -25,6 +26,8 @@ export function applyTheme(color: string) {
   const luminance = .2126 * linear[0] + .7152 * linear[1] + .0722 * linear[2];
   const root = document.documentElement;
   root.style.setProperty("--theme-hue", `${Math.round(hue)}deg`);
+  root.style.setProperty("--theme-saturation", delta === 0 ? "0" : "1");
+  root.style.setProperty("--accent-outline", luminance > .75 ? "#8b9290" : color);
   root.style.setProperty("--accent", color);
   root.style.setProperty("--accent-ink", luminance > .179 ? "#000000" : "#ffffff");
 }

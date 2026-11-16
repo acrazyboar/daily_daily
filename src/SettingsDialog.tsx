@@ -65,7 +65,7 @@ export default function SettingsDialog({ data, busy, storagePending, theme, them
           <p className="muted">选一个喜欢的颜色，即刻应用到导航、按钮与界面配色。</p>
           <div className="theme-options" role="group" aria-label="主题色">
             {THEMES.map(option => <button key={option.color} className="theme-option" aria-pressed={theme === option.color} onClick={() => onTheme(option.color)}>
-              <span className="theme-swatch" style={{ backgroundColor: option.color }} aria-hidden="true">{theme === option.color ? "✓" : ""}</span>
+              <span className="theme-swatch" style={{ backgroundColor: option.color, color: option.color === "#ffffff" ? "#000000" : "#ffffff" }} aria-hidden="true">{theme === option.color ? "✓" : ""}</span>
               {option.name}
             </button>)}
           </div>
