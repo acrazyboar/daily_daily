@@ -1,0 +1,76 @@
+name: macOS prerelease
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macos-arm64:
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate release version and notes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, tomllib
+          version = json.loads(pathlib.Path('package.json').read_text())['version']
+          assert os.environ['GITHUB_REF_NAME'] == 'v' + version, 'Tag and app version must match'
+          assert json.loads(pathlib.Path('src-tauri/tauri.conf.json').read_text())['version'] == version
+          assert tomllib.loads(pathlib.Path('src-tauri/Cargo.toml').read_text())['package']['version'] == version
+          assert pathlib.Path('docs/releases/' + os.environ['GITHUB_REF_NAME'] + '.md').is_file()
+          PY
+      - name: Prepare Rust and frontend dependencies
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add aarch64-apple-darwin
+          npm ci
+      - name: Test backend
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      - name: Build release application and DMG
+        run: npm run tauri build -- --target aarch64-apple-darwin --bundles app,dmg --config src-tauri/tauri.release.conf.json
+      - name: Verify and package downloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle=src-tauri/target/aarch64-apple-darwin/release/bundle
+          app="$bundle/macos/daily-log.app"
+          codesign --verify --deep --strict "$app"
+          mkdir -p output/release output/staging
+          ditto "$app" output/staging/日日记.app
+          ditto -c -k --sequesterRsrc --keepParent output/staging/日日记.app "output/release/Daily-Log_${GITHUB_REF_NAME}_macos-arm64.zip"
+          dmg=$(find "$bundle/dmg" -maxdepth 1 -name '*.dmg' -print -quit)
+          test -n "$dmg"
+          cp "$dmg" "output/release/Daily-Log_${GITHUB_REF_NAME}_macos-arm64.dmg"
+          cd output/release
+          shasum -a 256 *.dmg *.zip > SHA256SUMS.txt
+      - name: Publish downloadable prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          title="日日记 ${GITHUB_REF_NAME} · macOS 测试版"
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" output/release/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false --title "$title" --notes-file "$notes"
+          else
+            gh release create "$GITHUB_REF_NAME" output/release/* --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease --latest=false --title "$title" --notes-file "$notes"
+          fi
