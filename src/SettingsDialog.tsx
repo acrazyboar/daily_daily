@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import StorageSettings from "./StorageSettings";
+import type { Background } from "./theme";
 import { DEFAULT_THEME, THEMES } from "./theme";
 import type { Snapshot } from "./model";
-export default function SettingsDialog({ data, busy, storagePending, theme, themeError, error, message, externalChange, onTheme, onClose, change, onPending }: {
+export default function SettingsDialog({ data, busy, storagePending, theme, themeError, background, onBackground, error, message, externalChange, onTheme, onClose, change, onPending }: {
   data: Snapshot | null;
   busy: boolean;
   storagePending: boolean;
   theme: string;
   themeError: string;
+  background: Background;
+  onBackground: (background: Background) => void;
   error: string;
   message: string;
   externalChange: boolean;
@@ -73,13 +76,25 @@ export default function SettingsDialog({ data, busy, storagePending, theme, them
           </div>
           <p className="muted">偏好保存在这台设备上。打卡状态原有的红绿等级颜色保持不变。</p>
           <button className="secondary" disabled={theme === DEFAULT_THEME} onClick={() => onTheme(DEFAULT_THEME)}>恢复默认主题</button>
+          <div className="background-settings">
+            <h3>背景色</h3>
+            <p className="muted">背景可独立选择，不改变主题色和打卡状态颜色。</p>
+            <div className="background-options" role="group" aria-label="背景色">
+              <button className="background-option" aria-pressed={background === "theme"} onClick={() => onBackground("theme")}>
+                <span className="background-swatch background-theme" aria-hidden="true" />柔和底色
+              </button>
+              <button className="background-option" aria-pressed={background === "white"} onClick={() => onBackground("white")}>
+                <span className="background-swatch background-white" aria-hidden="true" />纯白
+              </button>
+            </div>
+          </div>
           {themeError && <p className="notice error" role="alert">{themeError}</p>}
         </section>
         <section id="storage-panel" role="tabpanel" aria-labelledby="storage-tab" hidden={tab !== "storage"}>
           <StorageSettings data={data} disabled={blocked || externalChange} change={change} onPending={onPending} />
         </section>
       </div>
-      <div className="settings-footer"><span className="muted">主题自动保存 · 数据迁移需单独确认</span><button className="primary" disabled={blocked} onClick={onClose}>完成</button></div>
+      <div className="settings-footer"><span className="muted">外观自动保存 · 数据迁移需单独确认</span><button className="primary" disabled={blocked} onClick={onClose}>完成</button></div>
     </dialog>, document.body,
   );
 }

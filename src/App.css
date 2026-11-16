@@ -2217,7 +2217,8 @@ select:focus-visible {
   font-size: 12px;
 }
 .matrix-cell.skipped-day,
-.year-day.skipped-day {
+.year-day.skipped-day,
+.matrix-legend .skipped-legend {
   background: repeating-linear-gradient(
     135deg,
     #f0f3eb,
@@ -2300,3 +2301,14 @@ select:focus-visible {
   .theme-options { grid-template-columns: repeat(3, 1fr); }
   .settings-footer { flex-wrap: wrap; }
 }
+
+:root[data-background="white"],
+:root[data-background="white"] .sidebar,
+:root[data-background="white"] .settings-dialog { background: #fff; }
+.background-settings { margin-top: 28px; padding-top: 24px; border-top: 1px solid hsl(var(--theme-hue) 14% 88%); }
+.background-options { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.background-option { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border: 2px solid hsl(var(--theme-hue) 14% 88%); border-radius: 12px; color: inherit; background: transparent; }
+.background-option[aria-pressed="true"] { border-color: var(--accent); }
+.background-swatch { width: 30px; height: 30px; border: 1px solid #d1d5d1; border-radius: 8px; }
+.background-theme { background: hsl(var(--theme-hue) 16% 96%); }
+.background-white { background: #fff; }

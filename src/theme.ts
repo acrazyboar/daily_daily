@@ -28,3 +28,13 @@ export function applyTheme(color: string) {
   root.style.setProperty("--accent", color);
   root.style.setProperty("--accent-ink", luminance > .179 ? "#000000" : "#ffffff");
 }
+
+export type Background = "theme" | "white";
+export const BACKGROUND_KEY = "daily-log.background";
+export function readBackground(): Background {
+  try { return localStorage.getItem(BACKGROUND_KEY) === "white" ? "white" : "theme"; }
+  catch { return "theme"; }
+}
+export function applyBackground(background: Background) {
+  document.documentElement.dataset.background = background;
+}

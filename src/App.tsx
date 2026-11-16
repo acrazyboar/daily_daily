@@ -1,5 +1,6 @@
+import type { Background } from "./theme";
 import SettingsDialog from "./SettingsDialog";
-import { applyTheme, readTheme, THEME_KEY } from "./theme";
+import { applyTheme, readTheme, THEME_KEY, applyBackground, readBackground, BACKGROUND_KEY } from "./theme";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
@@ -186,6 +187,13 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [theme, setTheme] = useState(readTheme);
   const [themeError, setThemeError] = useState("");
+  const [background, setBackground] = useState(readBackground);
+  function changeBackground(value: Background) {
+    applyBackground(value);
+    setBackground(value);
+    try { localStorage.setItem(BACKGROUND_KEY, value); setThemeError(""); }
+    catch { setThemeError("背景已应用，但暂时无法保存偏好，下次打开时可能恢复默认。"); }
+  }
   function changeTheme(color: string) {
     applyTheme(color);
     setTheme(color);
@@ -1173,13 +1181,7 @@ function App() {
                                           setSelected({ id: item.id, date })
                                         }
                                       >
-                                        {entry
-                                          ? Array.from(entry.statusLabel)[0]
-                                          : isSkipped(item, date)
-                                            ? "↷"
-                                            : unavailable
-                                            ? "·"
-                                            : "—"}
+
                                       </button>
                                     </td>
                                   );
@@ -1201,23 +1203,23 @@ function App() {
                     </div>
                     <div className="matrix-legend">
                       <span>
-                        <i style={tone(0)}>差</i>较差
+                        <i style={tone(0)} />较差
                       </span>
                       <span
                         className="gradient-bar"
                         aria-label="从红到绿渐变"
                       />
                       <span>
-                        <i style={tone(1)}>好</i>较好
+                        <i style={tone(1)} />较好
                       </span>
                       <span>
-                        <i>↷</i>已跳过
+                        <i className="skipped-legend" />已跳过
                       </span>
                       <span>
-                        <i>—</i>未记录
+                        <i />未记录
                       </span>
                       <span>
-                        <i className="unavailable">·</i>无需打卡 / 未开始 /
+                        <i className="unavailable" />无需打卡 / 未开始 /
                         已结束 / 未来
                       </span>
                     </div>
@@ -1315,6 +1317,7 @@ function App() {
       {settingsOpen && <SettingsDialog
         data={data} busy={busy} storagePending={storagePending} theme={theme} themeError={themeError}
         error={error} message={message} externalChange={externalChange}
+        background={background} onBackground={changeBackground}
         onTheme={changeTheme} onClose={() => setSettingsOpen(false)} change={action}
         onPending={v => { setStoragePending(v); mutating.current = v; }}
       />}
