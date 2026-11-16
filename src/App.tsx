@@ -1,4 +1,5 @@
-import StorageSettings from "./StorageSettings";
+import SettingsDialog from "./SettingsDialog";
+import { applyTheme, readTheme, THEME_KEY } from "./theme";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
@@ -177,11 +178,20 @@ function EntryCard({
   );
 }
 function App() {
-  const [page, setPage] = useState<"today" | "overview" | "manage" | "events" | "storage">(
+  const [page, setPage] = useState<"today" | "overview" | "manage" | "events">(
     "today",
   );
   const [data, setData] = useState<Snapshot | null>(null);
   const [busy, setBusy] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [theme, setTheme] = useState(readTheme);
+  const [themeError, setThemeError] = useState("");
+  function changeTheme(color: string) {
+    applyTheme(color);
+    setTheme(color);
+    try { localStorage.setItem(THEME_KEY, color); setThemeError(""); }
+    catch { setThemeError("主题已应用，但暂时无法保存偏好，下次打开时可能恢复默认。 "); }
+  }
   const [storagePending, setStoragePending] = useState(false);
   const [externalChange, setExternalChange] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -456,20 +466,19 @@ function App() {
           ))}
           <div className="nav-management">
             <button
-              className={`nav nav-parent ${page === "manage" || page === "events" || page === "storage" ? "active" : ""}`}
+              className={`nav nav-parent ${page === "manage" || page === "events" ? "active" : ""}`}
               onClick={() => {
                 setPage("manage");
                 setMessage("");
               }}
             >
-              <span aria-hidden="true">⚙</span>管理
+              <span aria-hidden="true">☷</span>管理
             </button>
             <div className="nav-subitems" role="group" aria-label="管理子项">
               {(
                 [
                   { id: "manage", label: "打卡" },
                   { id: "events", label: "事件" },
-                  { id: "storage", label: "数据存储" },
                 ] as const
               ).map((p) => (
                 <button
@@ -486,6 +495,9 @@ function App() {
               ))}
             </div>
           </div>
+          <button className="nav settings-trigger" aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={() => { setSettingsOpen(true); setError(""); setMessage(""); }}>
+            <span aria-hidden="true">⚙</span>设置
+          </button>
         </nav>
         <div className="sidebar-bottom">
           <button
@@ -519,7 +531,7 @@ function App() {
                 ? "管理 / 打卡"
                 : page === "events"
                   ? "管理 / 事件"
-                  : page === "storage" ? "管理 / 数据存储" : page.toUpperCase()}
+                  : page.toUpperCase()}
             </p>
             <h1>
               {page === "today"
@@ -528,7 +540,7 @@ function App() {
                   ? "每个关注点，都有自己的轨迹。"
                   : page === "events"
                     ? "每一段经历，都值得被记录。"
-                    : page === "storage" ? "让记录，跟着你。" : "把在意的事，放进日常。"}
+                    : "把在意的事，放进日常。"}
             </h1>
             <p className="subtitle">
               {page === "today"
@@ -539,7 +551,7 @@ function App() {
                     : "回看全年：长期关注使用日格，事件使用连续时间条。"
                   : page === "events"
                     ? "为短期的事设定起止日期，每天留下进展，结束后保留回忆。"
-                    : page === "storage" ? "管理数据位置，连接你的 iCloud Drive 文件夹。" : "添加你想关注的内容；移除后保留历史，也可以随时恢复。"}
+                    : "添加你想关注的内容；移除后保留历史，也可以随时恢复。"}
             </p>
           </div>
           <button
@@ -550,7 +562,7 @@ function App() {
             {loading ? "读取中…" : "刷新记录"}
           </button>
         </header>
-        {(page === "manage" || page === "events" || page === "storage") && (
+        {(page === "manage" || page === "events") && (
           <div className="management-tabs" role="group" aria-label="管理分类">
             <button
               aria-pressed={page === "manage"}
@@ -570,11 +582,9 @@ function App() {
             >
               事件
             </button>
-            <button aria-pressed={page === "storage"} onClick={() => { setPage("storage"); setMessage(""); }}>数据存储</button>
           </div>
         )}
         {externalChange && <div className="debug-mode-notice" role="alert">数据文件已被外部修改，尚未替换当前表单。请先复制未保存的内容，再点击“刷新记录”载入最新数据。</div>}
-        {page === "storage" && <StorageSettings data={data} disabled={busy || storagePending} change={action} onPending={(v) => { setStoragePending(v); mutating.current = v; }} />}
         {data?.clock?.simulated && (
           <div className="debug-mode-notice" role="status">
             正在使用模拟日期 <strong>{data.today}</strong> ·
@@ -1302,6 +1312,12 @@ function App() {
           </>
         )}
       </main>
+      {settingsOpen && <SettingsDialog
+        data={data} busy={busy} storagePending={storagePending} theme={theme} themeError={themeError}
+        error={error} message={message} externalChange={externalChange}
+        onTheme={changeTheme} onClose={() => setSettingsOpen(false)} change={action}
+        onPending={v => { setStoragePending(v); mutating.current = v; }}
+      />}
     </div>
   );
 }

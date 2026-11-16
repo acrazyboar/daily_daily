@@ -86,7 +86,7 @@ pub(super) fn read_current(root: &Path, simulated: bool) -> Result<Store, String
 }
 fn require_file(folder: &Path) -> Result<(), String> {
     if !folder.is_dir() || !folder.join("state.json").is_file() {
-        return Err("数据目录或 state.json 暂不可用。请在 Finder 中确认已下载，或重新连接目录，再刷新；不会自动创建空数据。可在管理 → 数据存储中切换位置。".into());
+        return Err("数据目录或 state.json 暂不可用。请在 Finder 中确认已下载，或重新连接目录，再刷新；不会自动创建空数据。可在设置 → 数据存储中切换位置。".into());
     }
     Ok(())
 }
