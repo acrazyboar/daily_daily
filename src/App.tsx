@@ -1,3 +1,4 @@
+import MonthlyViewport from "./MonthlyViewport";
 import type { Background } from "./theme";
 import SettingsDialog from "./SettingsDialog";
 import { applyTheme, readTheme, THEME_KEY, applyBackground, readBackground, BACKGROUND_KEY } from "./theme";
@@ -1103,12 +1104,7 @@ function App() {
               <>
                 {view === "month" ? (
                   <section className="matrix-card">
-                    <div
-                      className="matrix-scroll"
-                      tabIndex={0}
-                      role="region"
-                      aria-label="月度内容记录表，可横向滚动"
-                    >
+                    <MonthlyViewport key={monthKey} today={today}>
                       <table>
                         <colgroup>
                           <col />
@@ -1217,7 +1213,7 @@ function App() {
                           ))}
                         </tbody>
                       </table>
-                    </div>
+                    </MonthlyViewport>
                     <div className="matrix-legend">
                       <span>
                         <i style={tone(0)} />较差
