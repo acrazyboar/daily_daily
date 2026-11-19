@@ -1131,7 +1131,7 @@ function App() {
                                     : ""
                                 }
                               >
-                                {i + 1}
+                                <span className={i === todayColumn ? "today-date-badge" : undefined}>{i + 1}</span>
                               </th>
                             ))}
                             <th scope="col">记录数</th>

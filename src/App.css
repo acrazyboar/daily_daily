@@ -2301,27 +2301,41 @@ select:focus-visible {
 
 .brand-icon { padding: 0; flex-shrink: 0; user-select: none; -webkit-user-select: none; }
 
-/* Mark the current date independently from the selected date and grade colors. */
+/* A quiet, continuous ribbon marks today without framing the grade cells. */
 .matrix-scroll {
-  --today-column-edge: hsl(var(--theme-hue) calc(32% * var(--theme-saturation, 1)) 42%);
-  --today-column-fill: hsl(var(--theme-hue) calc(28% * var(--theme-saturation, 1)) 92%);
+  --today-column-ink: hsl(var(--theme-hue) calc(28% * var(--theme-saturation, 1)) 34%);
+  --today-column-fill: hsl(var(--theme-hue) calc(24% * var(--theme-saturation, 1)) 95%);
 }
 .matrix-day-column { width: 36px; }
-.matrix-scroll col.today-column { background: var(--today-column-fill); }
 .matrix-scroll th.date-today,
-.matrix-scroll td.date-today {
-  background: var(--today-column-fill);
-  box-shadow: inset 2px 0 var(--today-column-edge), inset -2px 0 var(--today-column-edge);
-}
+.matrix-scroll td.date-today { background: var(--today-column-fill); }
 .matrix-scroll th.date-today {
-  color: var(--today-column-edge);
-  box-shadow: inset 2px 0 var(--today-column-edge), inset -2px 0 var(--today-column-edge), inset 0 2px var(--today-column-edge);
+  color: var(--today-column-ink);
+  border-radius: 12px 12px 0 0;
 }
-.matrix-scroll tbody tr:last-child td.date-today {
-  box-shadow: inset 2px 0 var(--today-column-edge), inset -2px 0 var(--today-column-edge), inset 0 -2px var(--today-column-edge);
+.today-date-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--today-column-ink);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
 }
+.matrix-scroll td.date-today { border-bottom-color: transparent; }
+.matrix-scroll tbody tr:last-child td.date-today { border-radius: 0 0 12px 12px; }
 .matrix-scroll td.event-timeline-td { position: relative; }
-.today-column-marker { position: absolute; top: 0; bottom: 0; border-inline: 2px solid var(--today-column-edge); pointer-events: none; z-index: 1; }
-.matrix-scroll tbody tr:last-child .today-column-marker { border-bottom: 2px solid var(--today-column-edge); }
+.event-timeline-td .event-timeline { position: relative; z-index: 1; }
+.today-column-marker {
+  position: absolute;
+  top: 0;
+  bottom: -1px;
+  background: var(--today-column-fill);
+  pointer-events: none;
+}
+.matrix-scroll tbody tr:last-child .today-column-marker { bottom: 0; border-radius: 0 0 12px 12px; }
 .year-day.year-today { outline: 2px solid var(--accent-outline, #617a51); outline-offset: 1px; }
 .year-day.year-today.cell-selected { outline-width: 3px; }
