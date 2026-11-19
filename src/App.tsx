@@ -403,6 +403,7 @@ function App() {
   ).length;
   const monthKey = dateKey(month).slice(0, 7);
   const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const todayColumn = today.startsWith(monthKey + "-") ? Number(today.slice(-2)) - 1 : -1;
   const periodKey = view === "year" ? String(month.getFullYear()) : monthKey;
   const end = view === "year" ? `${periodKey}-12-31` : `${monthKey}-${days}`;
   const periodEntries = records.filter((r) => r.date.startsWith(periodKey));
@@ -1109,6 +1110,11 @@ function App() {
                       aria-label="月度内容记录表，可横向滚动"
                     >
                       <table>
+                        <colgroup>
+                          <col />
+                          {Array.from({ length: days }, (_, i) => <col key={i} className={`matrix-day-column ${i === todayColumn ? "today-column" : ""}`} />)}
+                          <col />
+                        </colgroup>
                         <thead>
                           <tr>
                             <th scope="col">记录内容 / 日期</th>
@@ -1116,6 +1122,8 @@ function App() {
                               <th
                                 key={i}
                                 scope="col"
+                                aria-current={i === todayColumn ? "date" : undefined}
+                                title={i === todayColumn ? "今天" : undefined}
                                 className={
                                   `${monthKey}-${String(i + 1).padStart(2, "0")}` ===
                                   today
@@ -1142,6 +1150,7 @@ function App() {
                                   colSpan={days}
                                   className="event-timeline-td"
                                 >
+                                  {todayColumn >= 0 && <span className="today-column-marker" aria-hidden="true" style={{ left: `${todayColumn / days * 100}%`, width: `${100 / days}%` }} />}
                                   <EventTimeline
                                     item={item}
                                     records={periodEntries}
@@ -1166,7 +1175,7 @@ function App() {
                                     (!!effectiveEnd(item) &&
                                       date > effectiveEnd(item)!);
                                   return (
-                                    <td key={date}>
+                                    <td key={date} className={date === today ? "date-today" : undefined}>
                                       <button
                                         className={`matrix-cell ${isSkipped(item, date) ? "skipped-day" : ""} ${unavailable && !entry ? "unavailable" : ""} ${selection?.id === item.id && selection.date === date ? "cell-selected" : ""}`}
                                         style={
@@ -1180,6 +1189,7 @@ function App() {
                                             : missingLabel(item, date, today)
                                         }
                                         aria-label={`${item.name} ${date} ${entry ? entry.statusLabel : missingLabel(item, date, today)}`}
+                                        aria-current={date === today ? "date" : undefined}
                                         aria-pressed={
                                           selection?.id === item.id &&
                                           selection.date === date

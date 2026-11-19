@@ -127,6 +127,7 @@ export default function YearOverview({
                         }
                         title={`${date} · ${label}`}
                         aria-label={`${item.name} ${date} ${label}`}
+                        aria-current={date === today ? "date" : undefined}
                         aria-pressed={
                           selection?.id === item.id && selection.date === date
                         }
