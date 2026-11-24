@@ -13,12 +13,17 @@ export default function MonthlyViewport({ today, children }: { today: string; ch
       if (!current) return;
       const bounds = element.getBoundingClientRect();
       const cell = current.getBoundingClientRect();
+      const dates = Array.from(element.querySelectorAll<HTMLElement>("thead th")).slice(1, -1);
+      const index = dates.indexOf(current);
+      const lookAhead = dates[Math.min(index + 2, dates.length - 1)].getBoundingClientRect();
       const label = element.querySelector('thead th:first-child')?.getBoundingClientRect();
       const left = bounds.left + element.clientLeft + (label?.width ?? 0);
       const right = bounds.left + element.clientLeft + element.clientWidth;
-      if (cell.right > right + 1 || cell.left < left - 1) {
-        // Keep the full month, moving only the viewport. Do not scroll the page vertically.
-        element.scrollLeft = Math.max(0, element.scrollLeft + cell.right - right);
+      if (lookAhead.right > right + 1 || cell.left < left - 1) {
+        // Include two following dates where available; keep today visible on very narrow layouts.
+        const desired = element.scrollLeft + lookAhead.right - right;
+        const keepTodayVisible = element.scrollLeft + cell.left - left;
+        element.scrollLeft = Math.max(0, Math.min(desired, keepTodayVisible));
       }
     }
     function resize() {
