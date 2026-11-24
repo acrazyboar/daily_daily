@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { baseScheduled, isExtra, isSkipped, repeatOn } from "./model";
+import { canAddExtra } from "./model";
 import type { Focus } from "./model";
 export default function ExtraCheckInPanel({
   items,
@@ -19,26 +19,13 @@ export default function ExtraCheckInPanel({
   const [date, setDate] = useState(today);
   const [id, setId] = useState("");
   const [added, setAdded] = useState<{ id: string; date: string } | null>(null);
-  const candidates = items.filter(
-    (i) =>
-      !i.event &&
-      !i.archived &&
-      ["weekly", "monthly"].includes(repeatOn(i, date).kind),
-  );
+  const candidates = date ? items.filter((item) => canAddExtra(item, date)) : [];
   const item = candidates.find((i) => i.id === id) ?? candidates[0];
   const issue = !date
     ? "请选择日期。"
     : !item
-      ? "所选日期没有适用的每周或每月打卡项。"
-      : date < item.createdOn
-        ? "日期不能早于项目创建日期。"
-        : isSkipped(item, date)
-          ? "这一天已跳过，请在日期详情或跳过列表中恢复。"
-          : baseScheduled(item, date)
-            ? "这一天已在原计划中，不用额外添加。"
-            : isExtra(item, date)
-              ? "这一天已经额外添加过了。"
-              : "";
+      ? "这一天没有可额外添加的打卡项，可以切换日期再查看。"
+      : "";
   return (
     <section className="extra-check-in-panel" aria-label="额外添加一次">
       <div className="section-heading">
@@ -74,9 +61,10 @@ export default function ExtraCheckInPanel({
               <select
                 id="extra-item"
                 value={item?.id ?? ""}
+                disabled={!candidates.length}
                 onChange={(e) => setId(e.target.value)}
               >
-                {!candidates.length && <option value="">无适用项目</option>}
+                {!candidates.length && <option value="">暂无可添加项目</option>}
                 {candidates.map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.name}
