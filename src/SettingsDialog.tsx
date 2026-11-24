@@ -59,7 +59,7 @@ export default function SettingsDialog({ data, busy, storagePending, theme, them
       <div className="settings-content">
         {error && <p className="notice error" role="alert">{error}</p>}
         {message && <p className="notice success" role="status">{message}</p>}
-        {externalChange && <p className="notice error" role="alert">数据文件已被外部修改。请关闭设置，复制未保存的内容后刷新记录，再调整存储位置。</p>}
+        {externalChange && <p className="notice error" role="alert">数据文件已被外部修改。请关闭设置，复制未保存的内容后，通过提示中的“重新载入”读取最新数据，再调整存储位置。</p>}
         <section id="appearance-panel" role="tabpanel" aria-labelledby="appearance-tab" hidden={tab !== "appearance"}>
           <h3>主题色</h3>
           <p className="muted">选一个喜欢的颜色，即刻应用到导航、按钮与界面配色。</p>

@@ -564,13 +564,14 @@ function App() {
                     : "添加你想关注的内容；移除后保留历史，也可以随时恢复。"}
             </p>}
           </div>
-          <button
-            className="secondary"
-            disabled={loading || busy || storagePending}
-            onClick={() => void refresh()}
-          >
-            {loading ? "读取中…" : "刷新记录"}
-          </button>
+          {page === "today" && <div className="today-header-summary">
+            <div className="today-record-count" role="status" aria-live="polite" aria-label={`${recorded}/${dailyItems.length} 个内容已记录`}>
+              <strong>{recorded}<span> / {dailyItems.length}</span></strong>
+              <span className="muted">个内容已记录</span>
+            </div>
+            {hasExtraCandidates && <button className="secondary" disabled={busy || loading}
+              aria-expanded={extraOpen} onClick={() => setExtraOpen(!extraOpen)}>＋ 额外添加一次</button>}
+          </div>}
         </header>
         {(page === "manage" || page === "events") && (
           <div className="management-tabs" role="group" aria-label="管理分类">
@@ -594,7 +595,10 @@ function App() {
             </button>
           </div>
         )}
-        {externalChange && <div className="debug-mode-notice" role="alert">数据文件已被外部修改，尚未替换当前表单。请先复制未保存的内容，再点击“刷新记录”载入最新数据。</div>}
+        {externalChange && <div className="debug-mode-notice" role="alert">
+          <span>数据文件已被外部修改，尚未替换当前表单。请先复制未保存的内容，再载入最新数据。</span>
+          <button className="secondary" disabled={loading || busy || storagePending} onClick={() => void refresh()}>重新载入</button>
+        </div>}
         {data?.clock?.simulated && (
           <div className="debug-mode-notice" role="status">
             正在使用模拟日期 <strong>{data.today}</strong> ·
@@ -631,7 +635,8 @@ function App() {
         )}
         {error && (
           <div className="notice error" role="alert">
-            {error}
+            <span>{error}</span>
+            <button className="secondary reload-after-error" disabled={loading || busy || storagePending} onClick={() => void refresh()}>重新载入</button>
           </div>
         )}
         {message && (
@@ -641,32 +646,6 @@ function App() {
         )}
         {page === "today" && (
           <>
-            <div className="daily-progress">
-              <div>
-                <strong>
-                  {recorded}
-                  <span> / {dailyItems.length}</span>
-                </strong>
-                <span> 个内容已记录</span>
-              </div>
-              <div className="daily-links">
-                {hasExtraCandidates && (
-                  <button
-                    className="secondary"
-                    disabled={busy || loading}
-                    onClick={() => setExtraOpen(!extraOpen)}
-                  >
-                    ＋ 额外添加一次
-                  </button>
-                )}
-                <button className="secondary" onClick={() => setPage("manage")}>
-                  管理
-                </button>
-                <button className="secondary" onClick={() => setPage("events")}>
-                  事件 →
-                </button>
-              </div>
-            </div>
             {extraOpen && (
               <ExtraCheckInPanel
                 items={active}

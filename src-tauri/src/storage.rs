@@ -156,7 +156,7 @@ pub(super) fn revision_for_store(folder: &Path, store: &Store) -> Result<String,
 fn ensure_revision(folder: &Path, expected: &str) -> Result<(), String> {
     if revision(folder)? != expected {
         return Err(
-            "数据已被其他设备或程序修改，本次未覆盖。请先复制未保存的内容，再点击刷新记录。".into(),
+            "数据已被其他设备或程序修改，本次未覆盖。请先复制未保存的内容，再点击“重新载入”。".into(),
         );
     }
     Ok(())
