@@ -468,7 +468,7 @@ function App() {
           <button className="brand-icon" aria-label="日日记" aria-expanded={debugOpen} aria-controls={debugOpen ? "date-debug-panel" : undefined}
             onClick={onBrandClick} onBlur={() => { debugClicks.current.count = 0; }}>日</button>
           <div>
-            日日记<small>把关注，变成日常。</small>
+            日日记
           </div>
         </div>
         <nav aria-label="主导航">
@@ -527,14 +527,9 @@ function App() {
           </button>
         </nav>
         <div className="sidebar-bottom">
-          <span className="local-dot" />
-          {data?.clock?.simulated ? "模拟记录（独立目录）" : "记录保存在数据文件夹"}
           <button className="folder-link" onClick={openFolder}>
             打开记录文件夹 ↗
           </button>
-          <p className="folder-path" title={data?.folder}>
-            {data?.folder ?? "正在读取存储位置…"}
-          </p>
         </div>
       </aside>
       <main
@@ -552,24 +547,22 @@ function App() {
             </p>
             <h1>
               {page === "today"
-                ? "今天，照顾好每一件小事。"
+                ? prettyDate(today)
                 : page === "overview"
                   ? "每个关注点，都有自己的轨迹。"
                   : page === "events"
                     ? "每一段经历，都值得被记录。"
                     : "把在意的事，放进日常。"}
             </h1>
-            <p className="subtitle">
-              {page === "today"
-                ? prettyDate(today)
-                : page === "overview"
+            {page !== "today" && <p className="subtitle">
+              {page === "overview"
                   ? view === "month"
                     ? "长期关注按天展示，事件以连续时间条展示。点击可查看记录。"
                     : "回看全年：长期关注使用日格，事件使用连续时间条。"
                   : page === "events"
                     ? "为短期的事设定起止日期，每天留下进展，结束后保留回忆。"
                     : "添加你想关注的内容；移除后保留历史，也可以随时恢复。"}
-            </p>
+            </p>}
           </div>
           <button
             className="secondary"

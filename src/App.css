@@ -77,14 +77,7 @@ button:hover:not(:disabled) {
   place-items: center;
   font-size: 21px;
 }
-.brand small {
-  display: block;
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  color: hsl(calc(var(--theme-hue) + 9.62deg) calc(5.14% * var(--theme-saturation, 1)) 49.61%);
-  font-weight: 400;
-  margin-top: 2px;
-}
+
 nav {
   margin-top: 54px;
   display: grid;
@@ -112,14 +105,7 @@ nav {
   font-size: 11px;
   color: hsl(calc(var(--theme-hue) + -11.0deg) calc(6.02% * var(--theme-saturation, 1)) 48.82%);
 }
-.local-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: hsl(calc(var(--theme-hue) + -11.6deg) calc(18.73% * var(--theme-saturation, 1)) 50.78%);
-  margin-right: 7px;
-}
+
 .folder-link {
   display: block;
   background: none;
@@ -490,7 +476,6 @@ textarea::placeholder {
     border-right: 0;
     border-bottom: 1px solid hsl(calc(var(--theme-hue) + -25.0deg) calc(16.67% * var(--theme-saturation, 1)) 88.24%);
   }
-  .brand small,
   .sidebar-bottom {
     display: none;
   }
