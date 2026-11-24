@@ -16,6 +16,7 @@ pub(super) struct Info {
     pub live_folder: String,
     pub backup_folder: String,
     pub custom: bool,
+    pub setup_required: bool,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,6 +24,7 @@ pub(super) struct Preview {
     folder: String,
     existing: bool,
     source_unavailable: bool,
+    initial_setup: bool,
     items: usize,
     records: usize,
 }
@@ -33,6 +35,7 @@ pub(super) struct Pending {
     target_bytes: Option<Vec<u8>>,
     is_default: bool,
     source_unavailable: bool,
+    initial_setup: bool,
 }
 fn settings(root: &Path) -> Result<Settings, String> {
     match fs::read(root.join("storage-settings.json")) {
@@ -41,6 +44,34 @@ fn settings(root: &Path) -> Result<Settings, String> {
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Settings::default()),
         Err(e) => Err(format!("无法读取存储设置：{e}")),
+    }
+}
+fn setup_required(root: &Path) -> Result<bool, String> {
+    settings(root)?;
+    if root.join("storage-settings.json").is_file() {
+        return Ok(false);
+    }
+    let legacy = workspace_dir(root, false);
+    if legacy.join("state.json").exists() {
+        return Ok(false);
+    }
+    match fs::read_dir(&legacy) {
+        Ok(entries) => {
+            for entry in entries {
+                let path = entry.map_err(|e| e.to_string())?.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("json")
+                    && path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .is_some_and(valid_date)
+                {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(true),
+        Err(e) => Err(format!("无法检查已有数据：{e}")),
     }
 }
 pub(super) fn live_folder(root: &Path) -> Result<PathBuf, String> {
@@ -61,9 +92,13 @@ pub(super) fn info(root: &Path) -> Result<Info, String> {
             .into(),
         backup_folder: root.join("storage-backups").to_string_lossy().into(),
         custom: config.folder.is_some(),
+        setup_required: setup_required(root)?,
     })
 }
 pub(super) fn directory(root: &Path, simulated: bool) -> Result<PathBuf, String> {
+    if setup_required(root)? {
+        return Err("请先设置数据文件夹，再开始记录。".into());
+    }
     if simulated {
         let path = workspace_dir(root, true);
         fs::create_dir_all(&path).map_err(|e| e.to_string())?;
@@ -189,10 +224,11 @@ fn preview(
     expected: &str,
     is_default: bool,
 ) -> Result<(Preview, Pending), String> {
+    let initial_setup = setup_required(root)?;
     let folder = fs::canonicalize(folder).map_err(|e| format!("无法访问选择的目录：{e}"))?;
     let source_unavailable = bytes(source).is_err();
     let source = fs::canonicalize(source).unwrap_or_else(|_| source.to_path_buf());
-    if folder == source {
+    if folder == source && !initial_setup {
         return Err("这已经是当前存储目录。".into());
     }
     let local = fs::canonicalize(root).map_err(|e| e.to_string())?;
@@ -226,7 +262,7 @@ fn preview(
     } else {
         (0, 0)
     };
-    if source_unavailable && target_bytes.is_none() {
+    if source_unavailable && target_bytes.is_none() && !initial_setup {
         return Err(
             "原数据暂不可用，不能迁移到空目录。请恢复原目录，或选择已有日日记数据的文件夹。".into(),
         );
@@ -237,7 +273,8 @@ fn preview(
         Preview {
             folder: folder.to_string_lossy().into(),
             existing: target_bytes.is_some(),
-            source_unavailable,
+            source_unavailable: source_unavailable && !initial_setup,
+            initial_setup,
             items,
             records,
         },
@@ -248,10 +285,14 @@ fn preview(
             target_bytes,
             is_default,
             source_unavailable,
+            initial_setup,
         },
     ))
 }
 fn confirm(root: &Path, pending: &Pending, expected: &str) -> Result<(), String> {
+    if pending.initial_setup != setup_required(root)? {
+        return Err("数据存储配置已变化，请刷新后重新选择目录。".into());
+    }
     if pending.source_revision != expected {
         return Err("预览后源数据已变化，请重新选择目录。".into());
     }
@@ -289,7 +330,14 @@ fn confirm(root: &Path, pending: &Pending, expected: &str) -> Result<(), String>
         backup(root, target, "target-before-open")?;
         read_store_impl(&pending.folder, false)?;
     } else {
-        let store = read_store_impl(&pending.source, false)?;
+        let store = if pending.initial_setup {
+            Store {
+                version: 6,
+                ..Default::default()
+            }
+        } else {
+            read_store_impl(&pending.source, false)?
+        };
         // Create only if absent, even if a remote file appears after the preview.
         let data = serde_json::to_vec_pretty(&store).map_err(|e| e.to_string())?;
         let mut tmp =
@@ -328,6 +376,7 @@ pub(super) async fn choose_storage_folder(
     lock: tauri::State<'_, Mutex<RuntimeState>>,
 ) -> Result<Option<Preview>, String> {
     let root = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&root).map_err(|e| e.to_string())?;
     let folder = if use_default {
         let p = workspace_dir(&root, false);
         fs::create_dir_all(&p).map_err(|e| e.to_string())?;
@@ -402,6 +451,7 @@ mod tests {
     use super::*;
     fn fixture() -> (tempfile::TempDir, PathBuf, Store) {
         let root = tempfile::tempdir().unwrap();
+        save_settings(root.path(), None).unwrap();
         let source = directory(root.path(), false).unwrap();
         let mut store = read_store(&source).unwrap();
         add_item_on(
@@ -488,13 +538,13 @@ mod tests {
         write_store(&source, &store).unwrap();
         assert!(confirm(root.path(), &pending, &rev).is_err());
         assert!(!target.path().join("state.json").exists());
-        assert!(!root.path().join("storage-settings.json").exists());
+        assert!(!info(root.path()).unwrap().custom);
         let current = revision(&source).unwrap();
         let (_, pending) = preview(root.path(), target.path(), &source, &current, false).unwrap();
         fs::write(target.path().join("state.json"), b"new remote file").unwrap();
         assert!(confirm(root.path(), &pending, &current).is_err());
         assert_eq!(bytes(target.path()).unwrap(), b"new remote file");
-        assert!(!root.path().join("storage-settings.json").exists());
+        assert!(!info(root.path()).unwrap().custom);
     }
     #[test]
     fn guarded_save_rejects_remote_changes_and_backs_up_successful_save() {
@@ -570,5 +620,112 @@ mod tests {
         simulated.records[0].note = "调试".into();
         guarded_write(root.path(), &debug, &simulated, &revision(&debug).unwrap()).unwrap();
         assert_eq!(bytes(target.path()).unwrap(), cloud_before);
+    }
+    #[test]
+    fn fresh_install_requires_choice_and_preview_does_not_initialize_data() {
+        let root = tempfile::tempdir().unwrap();
+        let target = tempfile::tempdir().unwrap();
+        let source = workspace_dir(root.path(), false);
+        assert!(info(root.path()).unwrap().setup_required);
+        assert!(read_current(root.path(), false).is_err());
+        assert!(!source.exists());
+        let (view, _cancelled) = preview(root.path(), target.path(), &source, "", false).unwrap();
+        assert!(view.initial_setup);
+        assert!(!view.source_unavailable);
+        assert!(!target.path().join("state.json").exists());
+        assert!(!root.path().join("storage-settings.json").exists());
+        assert!(setup_required(root.path()).unwrap());
+    }
+    #[test]
+    fn first_setup_creates_custom_folder_only_after_confirmation_and_survives_restart() {
+        let root = tempfile::tempdir().unwrap();
+        let target = tempfile::tempdir().unwrap();
+        let source = workspace_dir(root.path(), false);
+        let (_, pending) = preview(root.path(), target.path(), &source, "", false).unwrap();
+        confirm(root.path(), &pending, "").unwrap();
+        assert!(!setup_required(root.path()).unwrap());
+        let loaded = read_current(root.path(), false).unwrap();
+        assert_eq!(loaded.version, 6);
+        assert!(loaded.items.is_empty() && loaded.records.is_empty());
+        assert_eq!(
+            directory(root.path(), false).unwrap(),
+            fs::canonicalize(target.path()).unwrap()
+        );
+        assert!(!source.exists());
+    }
+    #[test]
+    fn first_setup_can_explicitly_select_the_default_folder() {
+        let root = tempfile::tempdir().unwrap();
+        let folder = workspace_dir(root.path(), false);
+        fs::create_dir_all(&folder).unwrap();
+        let (_, pending) = preview(root.path(), &folder, &folder, "", true).unwrap();
+        confirm(root.path(), &pending, "").unwrap();
+        assert!(!info(root.path()).unwrap().setup_required);
+        assert!(!info(root.path()).unwrap().custom);
+        assert!(folder.join("state.json").exists());
+        assert!(root.path().join("storage-settings.json").exists());
+        assert!(read_current(root.path(), false).unwrap().items.is_empty());
+    }
+    #[test]
+    fn first_setup_opens_existing_data_without_merging_or_changing_records() {
+        let (other_root, original_folder, _) = fixture();
+        let original = bytes(&original_folder).unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let source = workspace_dir(root.path(), false);
+        let (view, pending) = preview(root.path(), &original_folder, &source, "", false).unwrap();
+        assert!(view.existing && view.initial_setup);
+        assert_eq!(view.records, 1);
+        confirm(root.path(), &pending, "").unwrap();
+        assert_eq!(bytes(&original_folder).unwrap(), original);
+        assert_eq!(
+            read_current(root.path(), false).unwrap().records[0].note,
+            "原始记录"
+        );
+        assert!(!setup_required(root.path()).unwrap());
+        assert!(!source.exists());
+        assert_eq!(
+            read_current(other_root.path(), false)
+                .unwrap()
+                .records
+                .len(),
+            1
+        );
+    }
+    #[test]
+    fn legacy_data_is_recognized_and_first_setup_rejects_a_stale_target() {
+        let root = tempfile::tempdir().unwrap();
+        let source = workspace_dir(root.path(), false);
+        fs::create_dir_all(&source).unwrap();
+        let store = read_store(&source).unwrap();
+        assert!(!setup_required(root.path()).unwrap());
+        assert_eq!(
+            read_current(root.path(), false).unwrap().records,
+            store.records
+        );
+        fs::remove_file(source.join("state.json")).unwrap();
+        fs::write(
+            source.join("2026-11-12.json"),
+            r#"{"date":"2026-11-12","createdAt":"2026-11-12T12:00:00+08:00","note":"旧日志"}"#,
+        )
+        .unwrap();
+        assert!(!setup_required(root.path()).unwrap());
+        assert_eq!(
+            read_current(root.path(), false).unwrap().records[0].note,
+            "旧日志"
+        );
+        let fresh = tempfile::tempdir().unwrap();
+        let target = tempfile::tempdir().unwrap();
+        let (_, pending) = preview(
+            fresh.path(),
+            target.path(),
+            &workspace_dir(fresh.path(), false),
+            "",
+            false,
+        )
+        .unwrap();
+        fs::write(target.path().join("state.json"), "remote data appeared").unwrap();
+        assert!(confirm(fresh.path(), &pending, "").is_err());
+        assert_eq!(bytes(target.path()).unwrap(), b"remote data appeared");
+        assert!(setup_required(fresh.path()).unwrap());
     }
 }

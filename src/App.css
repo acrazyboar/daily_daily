@@ -2339,3 +2339,10 @@ select:focus-visible {
 .matrix-scroll tbody tr:last-child .today-column-marker { bottom: 0; border-radius: 0 0 12px 12px; }
 .year-day.year-today { outline: 2px solid var(--accent-outline, #617a51); outline-offset: 1px; }
 .year-day.year-today.cell-selected { outline-width: 3px; }
+
+.storage-onboarding { max-width: 900px; margin: 0 auto; padding: 40px 32px 64px; }
+.onboarding-brand { display: flex; align-items: center; gap: 12px; font-size: 22px; }
+.onboarding-header { display: block; margin: 36px 0 28px; }
+.onboarding-header h1 { margin: 8px 0 12px; }
+.storage-onboarding .storage-card { padding: 26px; }
+@media (max-width: 640px) { .storage-onboarding { padding: 24px 18px 40px; } }
