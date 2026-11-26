@@ -49,11 +49,11 @@ export default function StorageSettings({ data, disabled, change, onPending, ini
       {error && <p className="error-message" role="alert">{error}</p>}
     </div>
     {preview && <div className="storage-card storage-preview" aria-label="切换预览">
-      <h2>{preview.existing ? "打开已有日日记数据" : initialSetup ? "创建数据文件夹" : "迁移当前数据"}</h2>
+      <h2>{preview.existing ? "打开已有ndaka数据" : initialSetup ? "创建数据文件夹" : "迁移当前数据"}</h2>
       <p className="folder-path">{preview.folder}</p>
       <p>{preview.existing
         ? `目标文件夹包含 ${preview.items} 个项目、${preview.records} 条记录。确认后使用这份数据，不与当前内容合并；原目录仍然保留。`
-        : initialSetup ? "确认后在这里创建日日记的数据文件，之后的打卡和事件都保存在此文件夹。" : `确认后将当前 ${data?.items.length ?? 0} 个项目、${data?.records.length ?? 0} 条记录复制到这里，校验成功后切换。原目录仍然保留。`}</p>
+        : initialSetup ? "确认后在这里创建ndaka的数据文件，之后的打卡和事件都保存在此文件夹。" : `确认后将当前 ${data?.items.length ?? 0} 个项目、${data?.records.length ?? 0} 条记录复制到这里，校验成功后切换。原目录仍然保留。`}</p>
       <p className="muted">{initialSetup ? "已有数据会先校验并备份，再打开；不会自动合并不同数据文件夹。" : "切换前会在本机备份可读取的源数据和目标数据。"}</p>
       {preview.sourceUnavailable && <p role="alert">原数据目录目前不可用，无法备份它的最新内容。这次只打开目标已有数据，原目录和本机历史备份保留。</p>}
       <div className="storage-actions">
@@ -66,7 +66,7 @@ export default function StorageSettings({ data, disabled, change, onPending, ini
     <div className="storage-card">
       <h2>使用 iCloud Drive</h2>
       <ol>
-        <li>在 Finder 的 iCloud Drive 中新建一个空文件夹，例如“日日记”。</li>
+        <li>在 Finder 的 iCloud Drive 中新建一个空文件夹，例如“ndaka”。</li>
         <li>选择刚建的文件夹并确认；已有数据时，可选择打开那份数据。</li>
         <li>在其他电脑上等待文件下载完成，再选择同一个文件夹并打开已有数据。</li>
       </ol>

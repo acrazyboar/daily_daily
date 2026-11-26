@@ -196,7 +196,7 @@ fn local_lock(folder: &Path) -> Result<fs::File, String> {
         .open(folder.join(".daily-log.lock"))
         .map_err(|e| format!("无法锁定数据目录：{e}"))?;
     f.try_lock_exclusive()
-        .map_err(|_| "另一个日日记实例正在保存，请稍后重试。".to_string())?;
+        .map_err(|_| "另一个ndaka实例正在保存，请稍后重试。".to_string())?;
     Ok(f)
 }
 pub(super) fn guarded_write(
@@ -264,7 +264,7 @@ fn preview(
     };
     if source_unavailable && target_bytes.is_none() && !initial_setup {
         return Err(
-            "原数据暂不可用，不能迁移到空目录。请恢复原目录，或选择已有日日记数据的文件夹。".into(),
+            "原数据暂不可用，不能迁移到空目录。请恢复原目录，或选择已有ndaka数据的文件夹。".into(),
         );
     }
     // Validate readability and writability without replacing user files.
@@ -387,7 +387,7 @@ pub(super) async fn choose_storage_folder(
             handle
                 .dialog()
                 .file()
-                .set_title("选择日日记数据文件夹（可选 iCloud Drive 中的专用文件夹）")
+                .set_title("选择ndaka数据文件夹（可选 iCloud Drive 中的专用文件夹）")
                 .blocking_pick_folder()
         })
         .await

@@ -18,9 +18,9 @@ export default function StorageGate({ children }: { children: ReactNode }) {
   }, [retry]);
   if (status === "ready") return children;
   return <main className="storage-onboarding" aria-label="首次设置数据文件夹">
-    <div className="onboarding-brand"><span className="brand-icon" aria-hidden="true">日</span><strong>日日记</strong></div>
+    <div className="onboarding-brand"><span className="brand-icon" aria-hidden="true">日</span><strong>ndaka</strong></div>
     <header className="onboarding-header">
-      <p className="eyebrow">WELCOME TO DAILY LOG</p>
+      <p className="eyebrow">WELCOME TO NDAKA</p>
       <h1>先为记录选一个家。</h1>
       <p className="muted">选择数据文件夹后开始使用。以后可在“设置 → 数据存储”中更改。</p>
     </header>

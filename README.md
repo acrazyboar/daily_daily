@@ -1,6 +1,6 @@
-# Daily Log
+# ndaka
 
-日志记录桌面程序的基础项目，使用 Tauri 2、React 和 TypeScript。
+日志记录桌面程序，使用 Tauri 2、React 和 TypeScript。
 支持自定义多个关注项（例如睡眠、饮食），每日分别填写完成情况和备注，并在概览中按月或按年查看。
 
 导航分为“今日”“概览”“管理”；“管理”包含“打卡”和“事件”；独立的“设置”入口以弹窗提供外观和数据存储设置。
@@ -111,3 +111,5 @@ Rust stable 和 Node.js，然后运行 `npm ci` 与 `npm run tauri dev`。
 Windows 和 Linux 需要在各自系统上单独构建、测试。
 
 `package-lock.json` 和 `src-tauri/Cargo.lock` 用于锁定依赖版本。
+
+应用包、窗口和界面统一命名为 `ndaka`。为兼容已有记录，保留应用标识 `com.yajiey.dailylog`、本机配置及数据目录；从 `daily-log.app` 升级时替换旧应用即可，数据位置不变。

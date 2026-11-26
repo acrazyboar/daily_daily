@@ -465,10 +465,10 @@ function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <button className="brand-icon" aria-label="日日记" aria-expanded={debugOpen} aria-controls={debugOpen ? "date-debug-panel" : undefined}
+          <button className="brand-icon" aria-label="ndaka" aria-expanded={debugOpen} aria-controls={debugOpen ? "date-debug-panel" : undefined}
             onClick={onBrandClick} onBlur={() => { debugClicks.current.count = 0; }}>日</button>
           <div>
-            日日记
+            ndaka
           </div>
         </div>
         <nav aria-label="主导航">
